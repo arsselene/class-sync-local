@@ -14,7 +14,68 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      class_qr_codes: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          qr_code_data: string
+          schedule_id: string
+          used: boolean | null
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          qr_code_data: string
+          schedule_id: string
+          used?: boolean | null
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          qr_code_data?: string
+          schedule_id?: string
+          used?: boolean | null
+        }
+        Relationships: []
+      }
+      door_access_logs: {
+        Row: {
+          access_time: string
+          classroom_id: string
+          id: string
+          professor_id: string
+          qr_code_id: string | null
+          schedule_id: string
+        }
+        Insert: {
+          access_time?: string
+          classroom_id: string
+          id?: string
+          professor_id: string
+          qr_code_id?: string | null
+          schedule_id: string
+        }
+        Update: {
+          access_time?: string
+          classroom_id?: string
+          id?: string
+          professor_id?: string
+          qr_code_id?: string | null
+          schedule_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "door_access_logs_qr_code_id_fkey"
+            columns: ["qr_code_id"]
+            isOneToOne: false
+            referencedRelation: "class_qr_codes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

@@ -7,6 +7,7 @@ const navigation = [
   { name: "Classrooms", href: "/classrooms", icon: DoorOpen },
   { name: "Professors", href: "/professors", icon: Users },
   { name: "Schedule", href: "/schedule", icon: Calendar },
+  { name: "Door Control", href: "/door-control", icon: GraduationCap },
 ];
 
 export function Sidebar() {

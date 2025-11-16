@@ -8,7 +8,9 @@ import Index from "./pages/Index";
 import Classrooms from "./pages/Classrooms";
 import Professors from "./pages/Professors";
 import Schedule from "./pages/Schedule";
+import DoorControl from "./pages/DoorControl";
 import NotFound from "./pages/NotFound";
+import { useQRScheduler } from "./hooks/useQRScheduler";
 
 const queryClient = new QueryClient();
 
@@ -19,21 +21,29 @@ const Layout = ({ children }: { children: React.ReactNode }) => (
   </div>
 );
 
+function AppContent() {
+  useQRScheduler();
+  
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Layout><Index /></Layout>} />
+        <Route path="/classrooms" element={<Layout><Classrooms /></Layout>} />
+        <Route path="/professors" element={<Layout><Professors /></Layout>} />
+        <Route path="/schedule" element={<Layout><Schedule /></Layout>} />
+        <Route path="/door-control" element={<Layout><DoorControl /></Layout>} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Layout><Index /></Layout>} />
-          <Route path="/classrooms" element={<Layout><Classrooms /></Layout>} />
-          <Route path="/professors" element={<Layout><Professors /></Layout>} />
-          <Route path="/schedule" element={<Layout><Schedule /></Layout>} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
+      <AppContent />
     </TooltipProvider>
   </QueryClientProvider>
 );
