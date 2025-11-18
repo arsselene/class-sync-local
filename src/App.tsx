@@ -9,6 +9,7 @@ import Classrooms from "./pages/Classrooms";
 import Professors from "./pages/Professors";
 import Schedule from "./pages/Schedule";
 import DoorControl from "./pages/DoorControl";
+import Access from "./pages/Access";
 import NotFound from "./pages/NotFound";
 import { useQRScheduler } from "./hooks/useQRScheduler";
 
@@ -32,6 +33,7 @@ function AppContent() {
         <Route path="/professors" element={<Layout><Professors /></Layout>} />
         <Route path="/schedule" element={<Layout><Schedule /></Layout>} />
         <Route path="/door-control" element={<Layout><DoorControl /></Layout>} />
+        <Route path="/access" element={<Layout><Access /></Layout>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

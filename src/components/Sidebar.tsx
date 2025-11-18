@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, DoorOpen, Users, Calendar, GraduationCap } from "lucide-react";
+import { Home, DoorOpen, Users, Calendar, GraduationCap, QrCode } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigation = [
@@ -8,6 +8,7 @@ const navigation = [
   { name: "Professors", href: "/professors", icon: Users },
   { name: "Schedule", href: "/schedule", icon: Calendar },
   { name: "Door Control", href: "/door-control", icon: GraduationCap },
+  { name: "Access", href: "/access", icon: QrCode },
 ];
 
 export function Sidebar() {
