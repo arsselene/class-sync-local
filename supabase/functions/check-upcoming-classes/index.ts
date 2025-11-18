@@ -26,9 +26,9 @@ const handler = async (req: Request): Promise<Response> => {
     const currentDay = DAYS[now.getDay()];
     const currentTime = now.toTimeString().slice(0, 5);
     
-    // Calculate time 5 minutes from now
-    const fiveMinutesLater = new Date(now.getTime() + 5 * 60 * 1000);
-    const targetTime = fiveMinutesLater.toTimeString().slice(0, 5);
+    // Calculate time 10 minutes from now
+    const tenMinutesLater = new Date(now.getTime() + 10 * 60 * 1000);
+    const targetTime = tenMinutesLater.toTimeString().slice(0, 5);
 
     console.log(`Current day: ${currentDay}, Current time: ${currentTime}, Target time: ${targetTime}`);
 
@@ -46,7 +46,7 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Find classes starting in 5 minutes
+    // Find classes starting in 10 minutes
     const upcomingClasses = schedules.filter((schedule: any) => {
       return schedule.day === currentDay && 
              schedule.startTime >= currentTime && 
