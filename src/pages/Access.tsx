@@ -3,12 +3,16 @@ import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { Classroom, ClassSchedule, Professor } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
-import { QrCode, Send, Calendar, Clock, User, DoorOpen } from "lucide-react";
+import { QrCode, Send, Calendar, Clock, User, DoorOpen, Filter } from "lucide-react";
 import { toast } from "sonner";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -34,10 +38,13 @@ export default function Access() {
   const [qrCodes, setQrCodes] = useState<EnrichedQRCode[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Filters
-  const [professorFilter, setProfessorFilter] = useState<string>("all");
-  const [classroomFilter, setClassroomFilter] = useState<string>("all");
-  const [dateFilter, setDateFilter] = useState<string>("all");
+  // Global Filters
+  const [globalProfessorFilter, setGlobalProfessorFilter] = useState<string>("all");
+  const [globalClassroomFilter, setGlobalClassroomFilter] = useState<string>("all");
+  const [globalDateFilter, setGlobalDateFilter] = useState<Date | undefined>(undefined);
+  const [globalDayFilter, setGlobalDayFilter] = useState<string>("all");
+  
+  // QR Code specific filters
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
   useEffect(() => {
@@ -118,7 +125,7 @@ export default function Access() {
 
       if (error) throw error;
 
-      toast.success(`QR code sent to ${qrCode.professor.email}`);
+      toast.success('QR code sent successfully!');
     } catch (error) {
       console.error('Error sending QR code:', error);
       toast.error('Failed to send QR code');
@@ -133,21 +140,47 @@ export default function Access() {
     return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrCodeData)}`;
   };
 
-  // Apply filters
-  const filteredQRCodes = qrCodes.filter(qr => {
-    if (professorFilter !== "all" && qr.professor?.id !== professorFilter) return false;
-    if (classroomFilter !== "all" && qr.classroom?.id !== classroomFilter) return false;
-    if (dateFilter !== "all" && qr.schedule?.day !== dateFilter) return false;
-    if (statusFilter === "active" && (qr.used || isExpired(qr.expires_at))) return false;
+  const getProfessorName = (profId: string) => {
+    return professors.find(p => p.id === profId)?.name || "Unknown";
+  };
+
+  const getClassroomName = (classId: string) => {
+    return classrooms.find(c => c.id === classId)?.name || "Unknown";
+  };
+
+  // Global filtered data
+  const filteredProfessors = professors.filter(prof => {
+    if (globalProfessorFilter !== "all" && prof.id !== globalProfessorFilter) return false;
+    return true;
+  });
+
+  const filteredClassrooms = classrooms.filter(classroom => {
+    if (globalClassroomFilter !== "all" && classroom.id !== globalClassroomFilter) return false;
+    return true;
+  });
+
+  const filteredSchedules = schedules.filter(schedule => {
+    if (globalProfessorFilter !== "all" && schedule.professorId !== globalProfessorFilter) return false;
+    if (globalClassroomFilter !== "all" && schedule.classroomId !== globalClassroomFilter) return false;
+    if (globalDayFilter !== "all" && schedule.day !== globalDayFilter) return false;
+    if (globalDateFilter) {
+      const selectedDay = DAYS[globalDateFilter.getDay()];
+      if (schedule.day !== selectedDay) return false;
+    }
+    return true;
+  });
+
+  const filteredQRCodes = qrCodes.filter((qr) => {
+    if (statusFilter === "active" && (qr.used || new Date(qr.expires_at) < new Date())) return false;
+    if (statusFilter === "expired" && new Date(qr.expires_at) >= new Date()) return false;
     if (statusFilter === "used" && !qr.used) return false;
-    if (statusFilter === "expired" && (!isExpired(qr.expires_at) || qr.used)) return false;
     return true;
   });
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-muted-foreground">Loading QR codes...</div>
+        <div className="text-muted-foreground">Loading...</div>
       </div>
     );
   }
@@ -155,24 +188,27 @@ export default function Access() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">QR Code Access Management</h1>
+        <h1 className="text-3xl font-bold">Access Control</h1>
         <p className="text-muted-foreground mt-1">
-          View and manage classroom access QR codes
+          View and manage classroom access with global filters
         </p>
       </div>
 
-      {/* Filters */}
+      {/* Global Filters */}
       <Card>
         <CardHeader>
-          <CardTitle>Filters</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="h-5 w-5" />
+            Global Filters
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Professor</label>
-              <Select value={professorFilter} onValueChange={setProfessorFilter}>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Professor</label>
+              <Select value={globalProfessorFilter} onValueChange={setGlobalProfessorFilter}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="All Professors" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Professors</SelectItem>
@@ -185,28 +221,28 @@ export default function Access() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Classroom</label>
-              <Select value={classroomFilter} onValueChange={setClassroomFilter}>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Classroom</label>
+              <Select value={globalClassroomFilter} onValueChange={setGlobalClassroomFilter}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="All Classrooms" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Classrooms</SelectItem>
-                  {classrooms.map((room) => (
-                    <SelectItem key={room.id} value={room.id}>
-                      {room.name}
+                  {classrooms.map((classroom) => (
+                    <SelectItem key={classroom.id} value={classroom.id}>
+                      {classroom.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Day</label>
-              <Select value={dateFilter} onValueChange={setDateFilter}>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Day of Week</label>
+              <Select value={globalDayFilter} onValueChange={setGlobalDayFilter}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="All Days" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Days</SelectItem>
@@ -219,140 +255,258 @@ export default function Access() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Status</label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="used">Used</SelectItem>
-                  <SelectItem value="expired">Expired</SelectItem>
-                </SelectContent>
-              </Select>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Select Date</label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !globalDateFilter && "text-muted-foreground"
+                    )}
+                  >
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {globalDateFilter ? format(globalDateFilter, "PPP") : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={globalDateFilter}
+                    onSelect={setGlobalDateFilter}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
+          {(globalProfessorFilter !== "all" || globalClassroomFilter !== "all" || globalDateFilter || globalDayFilter !== "all") && (
+            <div className="mt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setGlobalProfessorFilter("all");
+                  setGlobalClassroomFilter("all");
+                  setGlobalDateFilter(undefined);
+                  setGlobalDayFilter("all");
+                }}
+              >
+                Clear All Filters
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* QR Codes Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {filteredQRCodes.map((qr) => {
-          const expired = isExpired(qr.expires_at);
-          const status = qr.used ? 'used' : expired ? 'expired' : 'active';
-
-          return (
-            <Card key={qr.id} className="overflow-hidden">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2">
-                    <QrCode className="h-5 w-5 text-primary" />
-                    <CardTitle className="text-lg">QR Code</CardTitle>
-                  </div>
-                  <Badge 
-                    variant={status === 'active' ? 'default' : status === 'used' ? 'secondary' : 'destructive'}
-                  >
-                    {status}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* QR Code Image */}
-                <div className="flex justify-center p-4 bg-muted rounded-lg">
-                  <img 
-                    src={getQRCodeImageUrl(qr.qr_code_data)} 
-                    alt="QR Code" 
-                    className="w-48 h-48"
-                  />
-                </div>
-
-                {/* Class Information */}
-                {qr.schedule && (
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-start gap-2">
-                      <DoorOpen className="h-4 w-4 text-muted-foreground mt-0.5" />
-                      <div>
-                        <span className="text-muted-foreground">Subject: </span>
-                        <span className="font-medium">{qr.schedule.subject}</span>
-                      </div>
-                    </div>
-
-                    {qr.professor && (
-                      <div className="flex items-start gap-2">
-                        <User className="h-4 w-4 text-muted-foreground mt-0.5" />
-                        <div>
-                          <span className="text-muted-foreground">Professor: </span>
-                          <span className="font-medium">{qr.professor.name}</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {qr.classroom && (
-                      <div className="flex items-start gap-2">
-                        <DoorOpen className="h-4 w-4 text-muted-foreground mt-0.5" />
-                        <div>
-                          <span className="text-muted-foreground">Classroom: </span>
-                          <span className="font-medium">{qr.classroom.name}</span>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex items-start gap-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground mt-0.5" />
-                      <div>
-                        <span className="text-muted-foreground">Day: </span>
-                        <span className="font-medium">{qr.schedule.day}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start gap-2">
-                      <Clock className="h-4 w-4 text-muted-foreground mt-0.5" />
-                      <div>
-                        <span className="text-muted-foreground">Time: </span>
-                        <span className="font-medium">
-                          {qr.schedule.startTime} - {qr.schedule.endTime}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Expiry Info */}
-                <div className="text-xs text-muted-foreground border-t pt-3">
-                  <div>Created: {new Date(qr.created_at).toLocaleString()}</div>
-                  <div>Expires: {new Date(qr.expires_at).toLocaleString()}</div>
-                </div>
-
-                {/* Send Button */}
-                {qr.professor && (
-                  <Button 
-                    onClick={() => sendQRCodeManually(qr)}
-                    className="w-full"
-                    variant={status === 'active' ? 'default' : 'outline'}
-                    disabled={!qr.schedule || !qr.professor || !qr.classroom}
-                  >
-                    <Send className="h-4 w-4 mr-2" />
-                    Send to {qr.professor.name}
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {filteredQRCodes.length === 0 && (
+      {/* Filtered Results */}
+      {(globalProfessorFilter !== "all" || globalClassroomFilter !== "all" || globalDateFilter || globalDayFilter !== "all") && (
         <Card>
-          <CardContent className="py-10 text-center text-muted-foreground">
-            {qrCodes.length === 0 
-              ? "No QR codes generated yet. QR codes will be automatically generated 10 minutes before each class."
-              : "No QR codes match the selected filters."
-            }
+          <CardHeader>
+            <CardTitle>Filtered Results</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Professors Section */}
+            {filteredProfessors.length > 0 && (
+              <div>
+                <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Professors ({filteredProfessors.length})
+                </h3>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Department</TableHead>
+                      <TableHead>Classes</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredProfessors.map((prof) => {
+                      const profSchedules = filteredSchedules.filter(s => s.professorId === prof.id);
+                      return (
+                        <TableRow key={prof.id}>
+                          <TableCell className="font-medium">{prof.name}</TableCell>
+                          <TableCell>{prof.email}</TableCell>
+                          <TableCell>{prof.department}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{profSchedules.length} classes</Badge>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            {/* Classrooms Section */}
+            {filteredClassrooms.length > 0 && (
+              <div>
+                <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                  <DoorOpen className="h-5 w-5" />
+                  Classrooms ({filteredClassrooms.length})
+                </h3>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Capacity</TableHead>
+                      <TableHead>Classes</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredClassrooms.map((classroom) => {
+                      const classSchedules = filteredSchedules.filter(s => s.classroomId === classroom.id);
+                      return (
+                        <TableRow key={classroom.id}>
+                          <TableCell className="font-medium">{classroom.name}</TableCell>
+                          <TableCell>{classroom.capacity}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{classSchedules.length} classes</Badge>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            {/* Schedules Section */}
+            {filteredSchedules.length > 0 && (
+              <div>
+                <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  Class Schedules ({filteredSchedules.length})
+                </h3>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Day</TableHead>
+                      <TableHead>Time</TableHead>
+                      <TableHead>Subject</TableHead>
+                      <TableHead>Professor</TableHead>
+                      <TableHead>Classroom</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredSchedules.map((schedule) => (
+                      <TableRow key={schedule.id}>
+                        <TableCell>
+                          <Badge>{schedule.day}</Badge>
+                        </TableCell>
+                        <TableCell>{schedule.startTime} - {schedule.endTime}</TableCell>
+                        <TableCell className="font-medium">{schedule.subject}</TableCell>
+                        <TableCell>{getProfessorName(schedule.professorId)}</TableCell>
+                        <TableCell>{getClassroomName(schedule.classroomId)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
+
+      {/* QR Codes Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <QrCode className="h-5 w-5" />
+            Generated QR Codes
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-4">
+            <label className="text-sm font-medium mb-2 block">Status Filter</label>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="All Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="expired">Expired</SelectItem>
+                <SelectItem value="used">Used</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {filteredQRCodes.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No QR codes found matching the filters
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {filteredQRCodes.map((qr) => (
+                <Card key={qr.id} className={cn(
+                  "relative",
+                  qr.used && "opacity-60",
+                  isExpired(qr.expires_at) && !qr.used && "border-destructive"
+                )}>
+                  <CardContent className="p-4">
+                    <div className="flex flex-col items-center space-y-3">
+                      <img
+                        src={getQRCodeImageUrl(qr.qr_code_data)}
+                        alt="QR Code"
+                        className="w-48 h-48 object-contain"
+                      />
+                      
+                      <div className="w-full space-y-2 text-sm">
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium">{qr.professor?.name || 'Unknown'}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <DoorOpen className="h-4 w-4 text-muted-foreground" />
+                          <span>{qr.classroom?.name || 'Unknown'}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-muted-foreground" />
+                          <span>{qr.schedule?.startTime} - {qr.schedule?.endTime}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          <span>{qr.schedule?.day}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Subject: {qr.schedule?.subject || 'Unknown'}
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 w-full">
+                        <Badge variant={qr.used ? "secondary" : isExpired(qr.expires_at) ? "destructive" : "default"}>
+                          {qr.used ? "Used" : isExpired(qr.expires_at) ? "Expired" : "Active"}
+                        </Badge>
+                        {!isExpired(qr.expires_at) && !qr.used && (
+                          <span className="text-xs text-muted-foreground">
+                            Expires: {new Date(qr.expires_at).toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+
+                      <Button
+                        onClick={() => sendQRCodeManually(qr)}
+                        disabled={qr.used || isExpired(qr.expires_at)}
+                        className="w-full"
+                        size="sm"
+                      >
+                        <Send className="h-4 w-4 mr-2" />
+                        Send Manually
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
