@@ -41,6 +41,27 @@ export type Database = {
         }
         Relationships: []
       }
+      classrooms: {
+        Row: {
+          capacity: number
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          capacity?: number
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          capacity?: number
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       door_access_logs: {
         Row: {
           access_time: string
@@ -72,6 +93,78 @@ export type Database = {
             columns: ["qr_code_id"]
             isOneToOne: false
             referencedRelation: "class_qr_codes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      professors: {
+        Row: {
+          created_at: string
+          department: string
+          email: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          department: string
+          email: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          department?: string
+          email?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      schedules: {
+        Row: {
+          classroom_id: string
+          created_at: string
+          day: string
+          end_time: string
+          id: string
+          professor_id: string
+          start_time: string
+          subject: string
+        }
+        Insert: {
+          classroom_id: string
+          created_at?: string
+          day: string
+          end_time: string
+          id?: string
+          professor_id: string
+          start_time: string
+          subject: string
+        }
+        Update: {
+          classroom_id?: string
+          created_at?: string
+          day?: string
+          end_time?: string
+          id?: string
+          professor_id?: string
+          start_time?: string
+          subject?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedules_classroom_id_fkey"
+            columns: ["classroom_id"]
+            isOneToOne: false
+            referencedRelation: "classrooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedules_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "professors"
             referencedColumns: ["id"]
           },
         ]

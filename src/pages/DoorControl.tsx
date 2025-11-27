@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { Classroom, ClassSchedule, Professor } from "@/types";
+import { useClassrooms } from "@/hooks/useClassrooms";
+import { useSchedules, ClassSchedule } from "@/hooks/useSchedules";
+import { useProfessors, Professor } from "@/hooks/useProfessors";
+import { Classroom } from "@/hooks/useClassrooms";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { DoorOpen, DoorClosed, Clock } from "lucide-react";
+import { DoorOpen, DoorClosed, Clock, User, Calendar } from "lucide-react";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -17,11 +19,13 @@ interface ClassroomStatus {
 }
 
 export default function DoorControl() {
-  const [classrooms] = useLocalStorage<Classroom[]>("classrooms", []);
-  const [schedules] = useLocalStorage<ClassSchedule[]>("schedules", []);
-  const [professors] = useLocalStorage<Professor[]>("professors", []);
+  const { classrooms, loading: classroomsLoading } = useClassrooms();
+  const { schedules, loading: schedulesLoading } = useSchedules();
+  const { professors, loading: professorsLoading } = useProfessors();
   const [classroomStatuses, setClassroomStatuses] = useState<ClassroomStatus[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  const loading = classroomsLoading || schedulesLoading || professorsLoading;
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -32,20 +36,22 @@ export default function DoorControl() {
   }, []);
 
   useEffect(() => {
+    if (loading) return;
+
     const currentDay = DAYS[currentTime.getDay()];
     const currentTimeStr = currentTime.toTimeString().slice(0, 5);
 
     const statuses: ClassroomStatus[] = classrooms.map((classroom) => {
       const todaySchedules = schedules.filter(
-        (s) => s.day === currentDay && s.classroomId === classroom.id
+        (s) => s.day === currentDay && s.classroom_id === classroom.id
       );
 
       const currentClass = todaySchedules.find((schedule) => {
-        return schedule.startTime <= currentTimeStr && schedule.endTime > currentTimeStr;
+        return schedule.start_time <= currentTimeStr && schedule.end_time > currentTimeStr;
       });
 
       if (currentClass) {
-        const professor = professors.find((p) => p.id === currentClass.professorId);
+        const professor = professors.find((p) => p.id === currentClass.professor_id);
         return {
           classroom,
           isOccupied: true,
@@ -60,20 +66,34 @@ export default function DoorControl() {
     });
 
     setClassroomStatuses(statuses);
-  }, [currentTime, classrooms, schedules, professors]);
+  }, [currentTime, classrooms, schedules, professors, loading]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-muted-foreground">Loading door control...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Door Control System</h1>
-        <p className="text-muted-foreground mt-1">
-          Real-time classroom availability monitoring
-        </p>
-        <div className="flex items-center gap-2 mt-4 text-sm">
-          <Clock className="h-4 w-4" />
-          <span>
-            {currentTime.toLocaleDateString()} {currentTime.toLocaleTimeString()}
-          </span>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Door Control System</h1>
+          <p className="text-muted-foreground mt-1">
+            Real-time classroom availability monitoring
+          </p>
+        </div>
+        <div className="text-right">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Calendar className="h-4 w-4" />
+            <span>{currentTime.toLocaleDateString()}</span>
+          </div>
+          <div className="flex items-center gap-2 text-2xl font-bold">
+            <Clock className="h-5 w-5" />
+            <span>{currentTime.toLocaleTimeString()}</span>
+          </div>
         </div>
       </div>
 
@@ -111,14 +131,14 @@ export default function DoorControl() {
                           <span className="text-xs text-muted-foreground">Subject:</span>
                           <p className="text-sm font-medium">{currentClass.schedule.subject}</p>
                         </div>
-                        <div>
-                          <span className="text-xs text-muted-foreground">Professor:</span>
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-muted-foreground" />
                           <p className="text-sm font-medium">{currentClass.professor.name}</p>
                         </div>
-                        <div>
-                          <span className="text-xs text-muted-foreground">Time:</span>
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-muted-foreground" />
                           <p className="text-sm font-medium">
-                            {currentClass.schedule.startTime} - {currentClass.schedule.endTime}
+                            {currentClass.schedule.start_time} - {currentClass.schedule.end_time}
                           </p>
                         </div>
                       </div>

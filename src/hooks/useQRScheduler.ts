@@ -1,14 +1,15 @@
 import { useEffect } from "react";
-import { useLocalStorage } from "./useLocalStorage";
-import { ClassSchedule, Professor, Classroom } from "@/types";
+import { useSchedules } from "./useSchedules";
+import { useProfessors } from "./useProfessors";
+import { useClassrooms } from "./useClassrooms";
 import { supabase } from "@/integrations/supabase/client";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export function useQRScheduler() {
-  const [schedules] = useLocalStorage<ClassSchedule[]>("schedules", []);
-  const [professors] = useLocalStorage<Professor[]>("professors", []);
-  const [classrooms] = useLocalStorage<Classroom[]>("classrooms", []);
+  const { schedules } = useSchedules();
+  const { professors } = useProfessors();
+  const { classrooms } = useClassrooms();
 
   useEffect(() => {
     // Check every minute for upcoming classes
@@ -24,14 +25,14 @@ export function useQRScheduler() {
       // Find classes starting in 10 minutes
       const upcomingClasses = schedules.filter((schedule) => {
         return schedule.day === currentDay && 
-               schedule.startTime >= currentTime && 
-               schedule.startTime <= targetTime;
+               schedule.start_time >= currentTime && 
+               schedule.start_time <= targetTime;
       });
 
       // Send QR codes for upcoming classes
       for (const schedule of upcomingClasses) {
-        const professor = professors.find((p) => p.id === schedule.professorId);
-        const classroom = classrooms.find((c) => c.id === schedule.classroomId);
+        const professor = professors.find((p) => p.id === schedule.professor_id);
+        const classroom = classrooms.find((c) => c.id === schedule.classroom_id);
 
         if (professor && classroom) {
           try {
@@ -42,8 +43,8 @@ export function useQRScheduler() {
                 professorName: professor.name,
                 subject: schedule.subject,
                 classroom: classroom.name,
-                startTime: schedule.startTime,
-                endTime: schedule.endTime,
+                startTime: schedule.start_time,
+                endTime: schedule.end_time,
                 day: schedule.day,
               },
             });

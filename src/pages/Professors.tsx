@@ -18,59 +18,39 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { Professor } from "@/types";
+import { useProfessors, Professor } from "@/hooks/useProfessors";
 import { toast } from "sonner";
 
 export default function Professors() {
-  const [professors, setProfessors] = useLocalStorage<Professor[]>("professors", []);
+  const { professors, loading, addProfessor, updateProfessor, deleteProfessor } = useProfessors();
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     department: "",
-    hoursPerWeek: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name || !formData.email || !formData.department || !formData.hoursPerWeek) {
+    if (!formData.name || !formData.email || !formData.department) {
       toast.error("Please fill in all fields");
       return;
     }
 
+    let success;
     if (editingId) {
-      setProfessors(
-        professors.map((p) =>
-          p.id === editingId
-            ? {
-                ...p,
-                name: formData.name,
-                email: formData.email,
-                department: formData.department,
-                hoursPerWeek: Number(formData.hoursPerWeek),
-              }
-            : p
-        )
-      );
-      toast.success("Professor updated successfully");
+      success = await updateProfessor(editingId, formData);
     } else {
-      const newProfessor: Professor = {
-        id: Date.now().toString(),
-        name: formData.name,
-        email: formData.email,
-        department: formData.department,
-        hoursPerWeek: Number(formData.hoursPerWeek),
-      };
-      setProfessors([...professors, newProfessor]);
-      toast.success("Professor added successfully");
+      success = await addProfessor(formData);
     }
 
-    setFormData({ name: "", email: "", department: "", hoursPerWeek: "" });
-    setEditingId(null);
-    setOpen(false);
+    if (success) {
+      setFormData({ name: "", email: "", department: "" });
+      setEditingId(null);
+      setOpen(false);
+    }
   };
 
   const handleEdit = (professor: Professor) => {
@@ -78,16 +58,22 @@ export default function Professors() {
       name: professor.name,
       email: professor.email,
       department: professor.department,
-      hoursPerWeek: professor.hoursPerWeek.toString(),
     });
     setEditingId(professor.id);
     setOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    setProfessors(professors.filter((p) => p.id !== id));
-    toast.success("Professor deleted successfully");
+  const handleDelete = async (id: string) => {
+    await deleteProfessor(id);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-muted-foreground">Loading professors...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -102,7 +88,7 @@ export default function Professors() {
           <DialogTrigger asChild>
             <Button
               onClick={() => {
-                setFormData({ name: "", email: "", department: "", hoursPerWeek: "" });
+                setFormData({ name: "", email: "", department: "" });
                 setEditingId(null);
               }}
             >
@@ -151,18 +137,6 @@ export default function Professors() {
                   }
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="hours">Hours Per Week</Label>
-                <Input
-                  id="hours"
-                  type="number"
-                  placeholder="e.g., 20"
-                  value={formData.hoursPerWeek}
-                  onChange={(e) =>
-                    setFormData({ ...formData, hoursPerWeek: e.target.value })
-                  }
-                />
-              </div>
               <Button type="submit" className="w-full">
                 {editingId ? "Update" : "Add"} Professor
               </Button>
@@ -178,14 +152,13 @@ export default function Professors() {
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Department</TableHead>
-              <TableHead>Hours/Week</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {professors.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground">
+                <TableCell colSpan={4} className="text-center text-muted-foreground">
                   No professors added yet. Click "Add Professor" to get started.
                 </TableCell>
               </TableRow>
@@ -195,7 +168,6 @@ export default function Professors() {
                   <TableCell className="font-medium">{professor.name}</TableCell>
                   <TableCell>{professor.email}</TableCell>
                   <TableCell>{professor.department}</TableCell>
-                  <TableCell>{professor.hoursPerWeek}h</TableCell>
                   <TableCell className="text-right">
                     <Button
                       variant="ghost"

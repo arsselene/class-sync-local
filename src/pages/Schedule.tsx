@@ -25,62 +25,61 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { Classroom, Professor, ClassSchedule } from "@/types";
+import { useSchedules } from "@/hooks/useSchedules";
+import { useClassrooms } from "@/hooks/useClassrooms";
+import { useProfessors } from "@/hooks/useProfessors";
 import { toast } from "sonner";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export default function Schedule() {
-  const [schedules, setSchedules] = useLocalStorage<ClassSchedule[]>("schedules", []);
-  const [classrooms] = useLocalStorage<Classroom[]>("classrooms", []);
-  const [professors] = useLocalStorage<Professor[]>("professors", []);
+  const { schedules, loading: schedulesLoading, addSchedule, deleteSchedule } = useSchedules();
+  const { classrooms, loading: classroomsLoading } = useClassrooms();
+  const { professors, loading: professorsLoading } = useProfessors();
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({
     day: "",
-    startTime: "",
-    endTime: "",
-    classroomId: "",
-    professorId: "",
+    start_time: "",
+    end_time: "",
+    classroom_id: "",
+    professor_id: "",
     subject: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const loading = schedulesLoading || classroomsLoading || professorsLoading;
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (
       !formData.day ||
-      !formData.startTime ||
-      !formData.endTime ||
-      !formData.classroomId ||
-      !formData.professorId ||
+      !formData.start_time ||
+      !formData.end_time ||
+      !formData.classroom_id ||
+      !formData.professor_id ||
       !formData.subject
     ) {
       toast.error("Please fill in all fields");
       return;
     }
 
-    const newSchedule: ClassSchedule = {
-      id: Date.now().toString(),
-      ...formData,
-    };
+    const success = await addSchedule(formData);
 
-    setSchedules([...schedules, newSchedule]);
-    toast.success("Class scheduled successfully");
-    setFormData({
-      day: "",
-      startTime: "",
-      endTime: "",
-      classroomId: "",
-      professorId: "",
-      subject: "",
-    });
-    setOpen(false);
+    if (success) {
+      setFormData({
+        day: "",
+        start_time: "",
+        end_time: "",
+        classroom_id: "",
+        professor_id: "",
+        subject: "",
+      });
+      setOpen(false);
+    }
   };
 
-  const handleDelete = (id: string) => {
-    setSchedules(schedules.filter((s) => s.id !== id));
-    toast.success("Schedule deleted successfully");
+  const handleDelete = async (id: string) => {
+    await deleteSchedule(id);
   };
 
   const getClassroomName = (id: string) => {
@@ -95,6 +94,14 @@ export default function Schedule() {
     day,
     classes: schedules.filter((s) => s.day === day),
   }));
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-muted-foreground">Loading schedules...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -111,10 +118,10 @@ export default function Schedule() {
               onClick={() =>
                 setFormData({
                   day: "",
-                  startTime: "",
-                  endTime: "",
-                  classroomId: "",
-                  professorId: "",
+                  start_time: "",
+                  end_time: "",
+                  classroom_id: "",
+                  professor_id: "",
                   subject: "",
                 })
               }
@@ -154,9 +161,9 @@ export default function Schedule() {
                   <Input
                     id="startTime"
                     type="time"
-                    value={formData.startTime}
+                    value={formData.start_time}
                     onChange={(e) =>
-                      setFormData({ ...formData, startTime: e.target.value })
+                      setFormData({ ...formData, start_time: e.target.value })
                     }
                   />
                 </div>
@@ -165,9 +172,9 @@ export default function Schedule() {
                   <Input
                     id="endTime"
                     type="time"
-                    value={formData.endTime}
+                    value={formData.end_time}
                     onChange={(e) =>
-                      setFormData({ ...formData, endTime: e.target.value })
+                      setFormData({ ...formData, end_time: e.target.value })
                     }
                   />
                 </div>
@@ -175,9 +182,9 @@ export default function Schedule() {
               <div className="space-y-2">
                 <Label>Classroom</Label>
                 <Select
-                  value={formData.classroomId}
+                  value={formData.classroom_id}
                   onValueChange={(value) =>
-                    setFormData({ ...formData, classroomId: value })
+                    setFormData({ ...formData, classroom_id: value })
                   }
                 >
                   <SelectTrigger>
@@ -195,9 +202,9 @@ export default function Schedule() {
               <div className="space-y-2">
                 <Label>Professor</Label>
                 <Select
-                  value={formData.professorId}
+                  value={formData.professor_id}
                   onValueChange={(value) =>
-                    setFormData({ ...formData, professorId: value })
+                    setFormData({ ...formData, professor_id: value })
                   }
                 >
                   <SelectTrigger>
@@ -260,11 +267,11 @@ export default function Schedule() {
                     classes.map((schedule) => (
                       <TableRow key={schedule.id}>
                         <TableCell className="font-medium">
-                          {schedule.startTime} - {schedule.endTime}
+                          {schedule.start_time} - {schedule.end_time}
                         </TableCell>
                         <TableCell>{schedule.subject}</TableCell>
-                        <TableCell>{getClassroomName(schedule.classroomId)}</TableCell>
-                        <TableCell>{getProfessorName(schedule.professorId)}</TableCell>
+                        <TableCell>{getClassroomName(schedule.classroom_id)}</TableCell>
+                        <TableCell>{getProfessorName(schedule.professor_id)}</TableCell>
                         <TableCell className="text-right">
                           <Button
                             variant="ghost"
