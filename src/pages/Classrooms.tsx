@@ -18,17 +18,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { Classroom } from "@/types";
+import { useClassrooms, Classroom } from "@/hooks/useClassrooms";
 import { toast } from "sonner";
 
 export default function Classrooms() {
-  const [classrooms, setClassrooms] = useLocalStorage<Classroom[]>("classrooms", []);
+  const { classrooms, loading, addClassroom, updateClassroom, deleteClassroom } = useClassrooms();
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ name: "", capacity: "" });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.name || !formData.capacity) {
@@ -36,28 +35,24 @@ export default function Classrooms() {
       return;
     }
 
+    let success;
     if (editingId) {
-      setClassrooms(
-        classrooms.map((c) =>
-          c.id === editingId
-            ? { ...c, name: formData.name, capacity: Number(formData.capacity) }
-            : c
-        )
-      );
-      toast.success("Classroom updated successfully");
-    } else {
-      const newClassroom: Classroom = {
-        id: Date.now().toString(),
+      success = await updateClassroom(editingId, {
         name: formData.name,
         capacity: Number(formData.capacity),
-      };
-      setClassrooms([...classrooms, newClassroom]);
-      toast.success("Classroom added successfully");
+      });
+    } else {
+      success = await addClassroom({
+        name: formData.name,
+        capacity: Number(formData.capacity),
+      });
     }
 
-    setFormData({ name: "", capacity: "" });
-    setEditingId(null);
-    setOpen(false);
+    if (success) {
+      setFormData({ name: "", capacity: "" });
+      setEditingId(null);
+      setOpen(false);
+    }
   };
 
   const handleEdit = (classroom: Classroom) => {
@@ -66,10 +61,17 @@ export default function Classrooms() {
     setOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    setClassrooms(classrooms.filter((c) => c.id !== id));
-    toast.success("Classroom deleted successfully");
+  const handleDelete = async (id: string) => {
+    await deleteClassroom(id);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-muted-foreground">Loading classrooms...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

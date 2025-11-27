@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { Classroom, ClassSchedule, Professor } from "@/types";
+import { useClassrooms } from "@/hooks/useClassrooms";
+import { useSchedules, ClassSchedule } from "@/hooks/useSchedules";
+import { useProfessors, Professor } from "@/hooks/useProfessors";
+import { Classroom } from "@/hooks/useClassrooms";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -32,11 +34,11 @@ interface EnrichedQRCode extends QRCodeData {
 }
 
 export default function Access() {
-  const [classrooms] = useLocalStorage<Classroom[]>("classrooms", []);
-  const [schedules] = useLocalStorage<ClassSchedule[]>("schedules", []);
-  const [professors] = useLocalStorage<Professor[]>("professors", []);
+  const { classrooms, loading: classroomsLoading } = useClassrooms();
+  const { schedules, loading: schedulesLoading } = useSchedules();
+  const { professors, loading: professorsLoading } = useProfessors();
   const [qrCodes, setQrCodes] = useState<EnrichedQRCode[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [qrLoading, setQrLoading] = useState(true);
   
   // Global Filters
   const [globalProfessorFilter, setGlobalProfessorFilter] = useState<string>("all");
@@ -47,10 +49,15 @@ export default function Access() {
   // QR Code specific filters
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
+  const loading = classroomsLoading || schedulesLoading || professorsLoading;
+
   useEffect(() => {
-    fetchQRCodes();
-    
-    // Subscribe to real-time updates
+    if (!loading) {
+      fetchQRCodes();
+    }
+  }, [loading, schedules, professors, classrooms]);
+
+  useEffect(() => {
     const channel = supabase
       .channel('qr_codes_changes')
       .on(
@@ -80,11 +87,10 @@ export default function Access() {
 
       if (error) throw error;
 
-      // Enrich QR codes with schedule, professor, and classroom data
       const enriched: EnrichedQRCode[] = (data || []).map((qr: QRCodeData) => {
         const schedule = schedules.find(s => s.id === qr.schedule_id);
-        const professor = schedule ? professors.find(p => p.id === schedule.professorId) : undefined;
-        const classroom = schedule ? classrooms.find(c => c.id === schedule.classroomId) : undefined;
+        const professor = schedule ? professors.find(p => p.id === schedule.professor_id) : undefined;
+        const classroom = schedule ? classrooms.find(c => c.id === schedule.classroom_id) : undefined;
         
         return {
           ...qr,
@@ -99,7 +105,7 @@ export default function Access() {
       console.error('Error fetching QR codes:', error);
       toast.error('Failed to load QR codes');
     } finally {
-      setLoading(false);
+      setQrLoading(false);
     }
   };
 
@@ -117,8 +123,8 @@ export default function Access() {
           professorName: qrCode.professor.name,
           subject: qrCode.schedule.subject,
           classroom: qrCode.classroom.name,
-          startTime: qrCode.schedule.startTime,
-          endTime: qrCode.schedule.endTime,
+          startTime: qrCode.schedule.start_time,
+          endTime: qrCode.schedule.end_time,
           day: qrCode.schedule.day,
         },
       });
@@ -160,8 +166,8 @@ export default function Access() {
   });
 
   const filteredSchedules = schedules.filter(schedule => {
-    if (globalProfessorFilter !== "all" && schedule.professorId !== globalProfessorFilter) return false;
-    if (globalClassroomFilter !== "all" && schedule.classroomId !== globalClassroomFilter) return false;
+    if (globalProfessorFilter !== "all" && schedule.professor_id !== globalProfessorFilter) return false;
+    if (globalClassroomFilter !== "all" && schedule.classroom_id !== globalClassroomFilter) return false;
     if (globalDayFilter !== "all" && schedule.day !== globalDayFilter) return false;
     if (globalDateFilter) {
       const selectedDay = DAYS[globalDateFilter.getDay()];
@@ -177,7 +183,7 @@ export default function Access() {
     return true;
   });
 
-  if (loading) {
+  if (loading || qrLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-muted-foreground">Loading...</div>
@@ -326,7 +332,7 @@ export default function Access() {
                   </TableHeader>
                   <TableBody>
                     {filteredProfessors.map((prof) => {
-                      const profSchedules = filteredSchedules.filter(s => s.professorId === prof.id);
+                      const profSchedules = filteredSchedules.filter(s => s.professor_id === prof.id);
                       return (
                         <TableRow key={prof.id}>
                           <TableCell className="font-medium">{prof.name}</TableCell>
@@ -360,7 +366,7 @@ export default function Access() {
                   </TableHeader>
                   <TableBody>
                     {filteredClassrooms.map((classroom) => {
-                      const classSchedules = filteredSchedules.filter(s => s.classroomId === classroom.id);
+                      const classSchedules = filteredSchedules.filter(s => s.classroom_id === classroom.id);
                       return (
                         <TableRow key={classroom.id}>
                           <TableCell className="font-medium">{classroom.name}</TableCell>
@@ -399,10 +405,10 @@ export default function Access() {
                         <TableCell>
                           <Badge>{schedule.day}</Badge>
                         </TableCell>
-                        <TableCell>{schedule.startTime} - {schedule.endTime}</TableCell>
+                        <TableCell>{schedule.start_time} - {schedule.end_time}</TableCell>
                         <TableCell className="font-medium">{schedule.subject}</TableCell>
-                        <TableCell>{getProfessorName(schedule.professorId)}</TableCell>
-                        <TableCell>{getClassroomName(schedule.classroomId)}</TableCell>
+                        <TableCell>{getProfessorName(schedule.professor_id)}</TableCell>
+                        <TableCell>{getClassroomName(schedule.classroom_id)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -460,19 +466,21 @@ export default function Access() {
                       <div className="w-full space-y-2 text-sm">
                         <div className="flex items-center gap-2">
                           <User className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">{qr.professor?.name || 'Unknown'}</span>
+                          <span>{qr.professor?.name || 'Unknown Professor'}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <DoorOpen className="h-4 w-4 text-muted-foreground" />
-                          <span>{qr.classroom?.name || 'Unknown'}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-muted-foreground" />
-                          <span>{qr.schedule?.startTime} - {qr.schedule?.endTime}</span>
+                          <span>{qr.classroom?.name || 'Unknown Classroom'}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <span>{qr.schedule?.day}</span>
+                          <span>{qr.schedule?.day || 'Unknown Day'}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-muted-foreground" />
+                          <span>
+                            {qr.schedule?.start_time} - {qr.schedule?.end_time}
+                          </span>
                         </div>
                         <div className="text-xs text-muted-foreground">
                           Subject: {qr.schedule?.subject || 'Unknown'}
@@ -483,21 +491,16 @@ export default function Access() {
                         <Badge variant={qr.used ? "secondary" : isExpired(qr.expires_at) ? "destructive" : "default"}>
                           {qr.used ? "Used" : isExpired(qr.expires_at) ? "Expired" : "Active"}
                         </Badge>
-                        {!isExpired(qr.expires_at) && !qr.used && (
-                          <span className="text-xs text-muted-foreground">
-                            Expires: {new Date(qr.expires_at).toLocaleString()}
-                          </span>
-                        )}
                       </div>
 
                       <Button
+                        size="sm"
+                        className="w-full"
                         onClick={() => sendQRCodeManually(qr)}
                         disabled={qr.used || isExpired(qr.expires_at)}
-                        className="w-full"
-                        size="sm"
                       >
                         <Send className="h-4 w-4 mr-2" />
-                        Send Manually
+                        Send to Professor
                       </Button>
                     </div>
                   </CardContent>

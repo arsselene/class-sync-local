@@ -1,12 +1,23 @@
 import { DoorOpen, Users, Calendar, BookOpen } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
-import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { Classroom, Professor, ClassSchedule } from "@/types";
+import { useClassrooms } from "@/hooks/useClassrooms";
+import { useProfessors } from "@/hooks/useProfessors";
+import { useSchedules } from "@/hooks/useSchedules";
 
 export default function Dashboard() {
-  const [classrooms] = useLocalStorage<Classroom[]>("classrooms", []);
-  const [professors] = useLocalStorage<Professor[]>("professors", []);
-  const [schedules] = useLocalStorage<ClassSchedule[]>("schedules", []);
+  const { classrooms, loading: classroomsLoading } = useClassrooms();
+  const { professors, loading: professorsLoading } = useProfessors();
+  const { schedules, loading: schedulesLoading } = useSchedules();
+
+  const loading = classroomsLoading || professorsLoading || schedulesLoading;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-muted-foreground">Loading dashboard...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
